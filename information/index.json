@@ -1,0 +1,51 @@
+{
+  "firm_name": "Caldwell Family Law Group",
+  "website": "https://www.caldwellfamilylaw.com/",
+  "domain": "www.caldwellfamilylaw.com",
+  "scraped_at": "2026-02-17 14:55:00",
+  "total_pages_scraped": 7,
+  "sections": [
+    {
+      "id": "about",
+      "title": "About Us",
+      "path": "information/about_us.md",
+      "description": "Firm overview, mission statement, and reasons to choose Caldwell Family Law Group."
+    },
+    {
+      "id": "attorneys",
+      "title": "Our Attorneys",
+      "path": "information/attorneys.md",
+      "description": "Profiles of our legal team including Margaret L. Caldwell, James R. Okafor, and Sofia Reyes-Torres."
+    },
+     {
+      "id": "practice_areas",
+      "title": "Practice Areas",
+      "path": "information/practice_areas.md",
+      "description": "Comprehensive list of family law services including Divorce, Child Custody, and Support."
+    },
+    {
+      "id": "how_it_works",
+      "title": "How It Works",
+      "path": "information/how_it_works.md",
+      "description": "Step-by-step guide to our legal process from consultation to resolution."
+    },
+    {
+      "id": "testimonials",
+      "title": "Client Reviews",
+      "path": "information/testimonials.md",
+      "description": "Feedback and success stories from past clients."
+    },
+    {
+      "id": "faqs",
+      "title": "Frequently Asked Questions",
+      "path": "information/faqs.md",
+      "description": "Answers to common questions about divorce costs, custody, and Texas law."
+    },
+    {
+      "id": "contact",
+      "title": "Contact Information",
+      "path": "information/contact.md",
+      "description": "Office address, phone number, email, and operating hours."
+    }
+  ]
+}
