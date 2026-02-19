@@ -254,7 +254,12 @@ document.addEventListener('DOMContentLoaded', () => {
         typingDiv.id = 'typing-indicator';
         typingDiv.innerHTML = '<span></span><span></span><span></span>';
         chatMessages.appendChild(typingDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Don't scroll if lead form is visible
+        const leadFormVisible = chatMessages.querySelector('.lead-form-card');
+        if (!leadFormVisible) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
     }
 
     function removeTyping() {
@@ -394,7 +399,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         chatSend.disabled = false;
-        chatInput.focus();
+
+        // Only focus if lead form isn't visible (don't steal focus from form fields)
+        const leadFormVisible = chatMessages.querySelector('.lead-form-card');
+        if (!leadFormVisible) {
+            chatInput.focus();
+        }
     }
 
     // Send message to backend
