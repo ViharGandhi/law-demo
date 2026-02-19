@@ -156,6 +156,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!chatWindow.classList.contains('chat-hidden')) {
             chatInput.focus();
             chatBadge.classList.add('hidden');
+            // Always scroll to bottom when chat opens
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 50);
         }
     });
 
@@ -222,7 +226,21 @@ document.addEventListener('DOMContentLoaded', () => {
         msgDiv.appendChild(timeSpan);
 
         chatMessages.appendChild(msgDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Smart scroll behavior
+        const leadFormVisible = chatMessages.querySelector('.lead-form-card');
+        if (!leadFormVisible) {
+            if (type === 'user') {
+                // User messages: always scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            } else {
+                // Bot messages: scroll to the TOP of the new message so user reads from start
+                setTimeout(() => {
+                    msgDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
+            }
+        }
+        // If lead form is visible, don't auto-scroll at all
 
         // Track context for lead capture
         conversationContext.push({ role: type, content: text });
