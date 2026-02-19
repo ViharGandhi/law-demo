@@ -17,7 +17,7 @@
       "path": "information/attorneys.md",
       "description": "Profiles of our legal team including Margaret L. Caldwell, James R. Okafor, and Sofia Reyes-Torres."
     },
-     {
+    {
       "id": "practice_areas",
       "title": "Practice Areas",
       "path": "information/practice_areas.md",
@@ -46,6 +46,12 @@
       "title": "Contact Information",
       "path": "information/contact.md",
       "description": "Office address, phone number, email, and operating hours."
+    },
+    {
+      "id": "chatbot_gap_info",
+      "title": "Chatbot Operational Info – Booking, Urgency & Disqualifiers",
+      "path": "information/gaps-info.md",
+      "description": "Covers consultation booking process, after-hours procedures, and case disqualifiers including geographic coverage and conflict of interest policy."
     }
   ]
 }

@@ -55,8 +55,22 @@ def load_mini_context():
     return ""
 
 
+# ─── Helper: Convert frontend history to OpenAI messages ─────────────────────
+def _build_history(history: list[dict]) -> list[dict]:
+    """
+    Convert [{role: 'user'|'bot', content: '...'}] from the frontend
+    into OpenAI-compatible [{role: 'user'|'assistant', content: '...'}].
+    Keep only the last 10 exchanges to stay within context limits.
+    """
+    messages = []
+    for msg in history[-10:]:
+        role = "assistant" if msg.get("role") == "bot" else "user"
+        messages.append({"role": role, "content": msg.get("content", "")})
+    return messages
+
+
 # ─── Step 0: Try answering from mini-context.md first ────────────────────────
-def try_mini_context(question: str, mini_context: str, firm_name: str) -> str | None:
+def try_mini_context(question: str, mini_context: str, firm_name: str, history: list[dict] = None) -> str | None:
     """
     Attempt to answer the question using only mini-context.md.
     Returns the answer string if the AI can answer confidently,
@@ -65,24 +79,32 @@ def try_mini_context(question: str, mini_context: str, firm_name: str) -> str | 
     if not mini_context:
         return None
 
-    system_prompt = f"""You are a helpful and professional chatbot assistant for {firm_name}.
+    system_prompt = f"""You are a warm, caring assistant for {firm_name}.
 You have been given a quick-overview document about the firm.
+
+TONE & STYLE:
+- Speak like a kind, knowledgeable friend who works at a family law firm.
+- Be empathetic — the person reaching out may be going through one of the hardest times of their life.
+- Keep things conversational and reassuring, not robotic or overly formal.
+- Use simple, clear language. Avoid excessive legal jargon.
 
 RULES:
 - If the user's question can be FULLY and CONFIDENTLY answered using ONLY the overview below, answer it directly.
-- If the question is a greeting or general chat, respond naturally and offer to help.
+- If the question is a greeting or general chat, respond warmly and let them know you're here to help with anything about the firm.
 - If the overview does NOT contain enough detail to answer properly, respond with EXACTLY the word: NEED_MORE_INFO
 - Do NOT guess or make up information beyond what is provided.
 
 FIRM OVERVIEW:
 {mini_context}"""
 
+    messages = [{"role": "system", "content": system_prompt}]
+    if history:
+        messages.extend(_build_history(history))
+    messages.append({"role": "user", "content": question})
+
     response = client.chat.completions.create(
         model=MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ],
+        messages=messages,
     )
 
     answer = response.choices[0].message.content.strip()
@@ -143,7 +165,7 @@ Respond with ONLY a JSON array of "path" values, e.g. ["contact.md", "about.md"]
 
 
 # ─── Step 2: Read file + answer question ─────────────────────────────────────
-def answer_question(question: str, file_paths: list[str], index: dict) -> str:
+def answer_question(question: str, file_paths: list[str], index: dict, history: list[dict] = None) -> str:
     """
     Read the content of the selected file(s) and ask AI to answer
     the question based on that content.
@@ -151,23 +173,27 @@ def answer_question(question: str, file_paths: list[str], index: dict) -> str:
     firm_name = index.get("firm_name", "our firm")
 
     if not file_paths or file_paths == ["NONE"]:
-        system_prompt = f"""You are a friendly assistant for {firm_name}. 
-Respond naturally as a law firm chatbot. Be helpful and professional. if you feel the question is not related
-to the firm or is way offtopic and not dosent even come in the json  then just directly say i can only help you with the question related to firm
-If they're greeting you, greet them back and offer to help with legal questions."""
+        system_prompt = f"""You are a warm, caring assistant for {firm_name}. 
+You're here to help people who may be dealing with difficult family situations.
+
+TONE & STYLE:
+- Speak like a kind, knowledgeable friend — empathetic, patient, and reassuring.
+- Keep things conversational. Avoid sounding robotic or overly formal.
+- If they're greeting you, greet them back warmly and let them know you're here to help with any questions about the firm.
+- If the question is clearly unrelated to family law or the firm, gently let them know you can only help with questions related to {firm_name}."""
+
+        messages = [{"role": "system", "content": system_prompt}]
+        if history:
+            messages.extend(_build_history(history))
+        messages.append({"role": "user", "content": question})
 
         response = client.chat.completions.create(
             model=MODEL,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": question},
-            ],
+            messages=messages,
         )
         return response.choices[0].message.content.strip()
 
     # Load content from the selected files
-    # NOTE: Paths in index.json are relative to the project root (e.g. "information/about_us.md"),
-    #       so we resolve them against the script's directory, NOT DATA_DIR.
     base_dir = os.path.dirname(os.path.abspath(__file__))
     context_parts = []
     for fp in file_paths:
@@ -181,22 +207,27 @@ If they're greeting you, greet them back and offer to help with legal questions.
 
     context = "\n".join(context_parts)
 
-    system_prompt = f"""You are a helpful and professional chatbot assistant for {firm_name}.
+    system_prompt = f"""You are a warm, caring assistant for {firm_name}.
 Answer the user's question based ONLY on the information provided below.
-If the answer is not in the provided content, say you don't have that information 
-and suggest they contact the firm directly.
+If the answer is not in the provided content, let them know kindly and suggest they reach out to the firm directly — they'd be happy to help.
 
-Be conversational, concise, and helpful. Use bullet points when listing multiple items.
+TONE & STYLE:
+- Speak like a kind, knowledgeable friend who works at a family law firm.
+- Be empathetic — the person may be going through a really tough time. Acknowledge that when it feels right.
+- Keep things conversational, clear, and reassuring. Avoid sounding like a robot.
+- Use bullet points when listing multiple items, but keep it warm.
 
 FIRM INFORMATION:
 {context}"""
 
+    messages = [{"role": "system", "content": system_prompt}]
+    if history:
+        messages.extend(_build_history(history))
+    messages.append({"role": "user", "content": question})
+
     response = client.chat.completions.create(
         model=MODEL,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ],
+        messages=messages,
     )
     return response.choices[0].message.content.strip()
 

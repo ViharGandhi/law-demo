@@ -142,23 +142,19 @@ document.addEventListener('DOMContentLoaded', () => {
     let messageCount = 0;
     let leadFormShown = false;
     let leadCaptured = false;
+    let leadSkipCount = 0;
     let conversationContext = [];
 
-    // Initially disable input
-    chatInput.disabled = true;
-    chatSend.disabled = true;
-    chatInput.placeholder = "Please complete the form above...";
+    // Chat input is enabled from the start (no lead gate)
+    chatInput.disabled = false;
+    chatSend.disabled = false;
+    chatInput.placeholder = "Type your question...";
 
     // Toggle chat open/close
     chatToggle.addEventListener('click', () => {
         chatWindow.classList.toggle('chat-hidden');
         if (!chatWindow.classList.contains('chat-hidden')) {
-            // Show lead form immediately if not yet handled
-            if (!leadFormShown && !leadCaptured) {
-                setTimeout(showLeadForm, 500);
-            } else if (!leadCaptured) {
-                chatInput.focus();
-            }
+            chatInput.focus();
             chatBadge.classList.add('hidden');
         }
     });
@@ -167,24 +163,46 @@ document.addEventListener('DOMContentLoaded', () => {
         chatWindow.classList.add('chat-hidden');
     });
 
-    // Simple Markdown-lite formatter
+    // Markdown formatter for bot messages
     function formatMessage(text) {
-        // Convert **bold** to <strong>
-        let formatted = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        // Convert - list items to <li> if multi-line
-        if (formatted.includes('\n- ')) {
-            const lines = formatted.split('\n');
-            formatted = lines.map(line => {
-                if (line.trim().startsWith('- ')) {
-                    return `<li>${line.trim().substring(2)}</li>`;
-                }
-                return line;
-            }).join('\n');
-            // Wrap sets of <li> in <ul>
-            formatted = formatted.replace(/(<li>.*<\/li>\n?)+/g, (match) => `<ul>${match}</ul>`);
-        }
-        // Convert remaining newlines to <br>
-        return formatted.replace(/\n/g, '<br>');
+        let html = text;
+
+        // Code blocks (```...```)
+        html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+
+        // Inline code (`...`)
+        html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Headers (### h4, ## h3, # h2)
+        html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+        html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+
+        // Bold **text**
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        // Italic *text*
+        html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+
+        // Links [text](url)
+        html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+        // Unordered list items (- item at line start)
+        html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+        // Wrap consecutive <li> in <ul>
+        html = html.replace(/(<li>.*?<\/li>\n?)+/g, (match) => '<ul>' + match + '</ul>');
+
+        // Horizontal rule
+        html = html.replace(/^---$/gm, '<hr>');
+
+        // Line breaks (remaining newlines)
+        html = html.replace(/\n/g, '<br>');
+
+        // Clean up: remove <br> adjacent to block elements
+        html = html.replace(/<\/(h[234]|ul|ol|pre|hr)><br>/g, '</$1>');
+        html = html.replace(/<br><(h[234]|ul|ol|pre|hr)/g, '<$1');
+
+        return html;
     }
 
     // Add a message to the chat
@@ -208,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Track context for lead capture
         conversationContext.push({ role: type, content: text });
-        if (conversationContext.length > 6) conversationContext.shift();
+        if (conversationContext.length > 10) conversationContext.shift();
     }
 
     // Show typing indicator
@@ -237,23 +255,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function unlockChat() {
-        chatInput.disabled = false;
-        chatSend.disabled = false;
-        chatInput.placeholder = "Type your question...";
-        if (suggestionChips) suggestionChips.style.opacity = "1";
-        chatInput.focus();
-    }
-
-    function showLeadForm() {
+    function showLeadForm(mandatory) {
         leadFormShown = true;
         const template = document.getElementById('lead-form-template');
         const clone = template.content.cloneNode(true);
 
         const form = clone.querySelector('#lead-capture-form');
+        const card = clone.querySelector('.lead-form-card');
+
+        // Update heading & message based on mandatory flag
+        if (mandatory) {
+            card.querySelector('h3').textContent = "We'd love to help you further!";
+            card.querySelector('p').textContent = "Please share your details so an attorney from our firm can reach out to you personally. We're here for you.";
+            // Disable chat input until they fill out the form
+            chatInput.disabled = true;
+            chatSend.disabled = true;
+            chatInput.placeholder = "Please share your details above to continue...";
+        }
+
+        // Only show skip button on first appearance
+        if (!mandatory) {
+            const skipBtn = document.createElement('button');
+            skipBtn.type = 'button';
+            skipBtn.className = 'skip-lead';
+            skipBtn.textContent = 'Skip for now';
+            card.appendChild(skipBtn);
+        }
 
         chatMessages.appendChild(clone);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        const insertedCard = chatMessages.querySelector('.lead-form-card');
+
+        // Handle Skip (only exists on first appearance)
+        if (!mandatory) {
+            insertedCard.querySelector('.skip-lead').addEventListener('click', () => {
+                leadSkipCount++;
+                leadFormShown = false; // allow it to appear again  
+                insertedCard.remove();
+            });
+        }
 
         // Handle Form Submit
         form.addEventListener('submit', async (e) => {
@@ -261,7 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const email = form.querySelector('#lead-email').value;
             const phone = form.querySelector('#lead-phone').value;
 
-            const submitBtn = form.querySelector('button');
+            const submitBtn = form.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
             submitBtn.textContent = 'Sending...';
 
@@ -271,10 +312,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 leadCaptured = true;
                 const card = form.closest('.lead-form-card');
-                card.remove(); // Remove form immediately
+                card.remove();
 
-                unlockChat();
-                addMessage("Thank you! How can I help you today?", 'bot');
+                // Re-enable chat input
+                chatInput.disabled = false;
+                chatSend.disabled = false;
+                chatInput.placeholder = "Type your question...";
+                chatInput.focus();
+
+                addMessage("Thanks for sharing your details! We'll have someone reach out to you. In the meantime, feel free to keep asking me anything. \ud83d\ude0a", 'bot');
             } catch (err) {
                 alert("Error. Please try again.");
                 submitBtn.disabled = false;
@@ -294,6 +340,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Show user message
         addMessage(message, 'user');
         messageCount++;
+
+        // Show lead form: first at 2 messages (skippable), again at 4 messages (mandatory)
+        if (!leadCaptured && !leadFormShown) {
+            if (leadSkipCount === 0 && messageCount === 2) {
+                setTimeout(() => showLeadForm(false), 800);
+            } else if (leadSkipCount > 0 && messageCount === 4) {
+                setTimeout(() => showLeadForm(true), 800);
+            }
+        }
         chatInput.value = '';
         chatSend.disabled = true;
 
@@ -304,7 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: message })
+                body: JSON.stringify({ message: message, history: conversationContext.slice(0, -1) })
             });
 
             removeTyping();
